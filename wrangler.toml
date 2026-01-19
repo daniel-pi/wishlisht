@@ -1,0 +1,15 @@
+name = "wishlisht"
+main = "src/index.tsx"
+compatibility_date = "2024-04-05"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wishlisht-db"
+database_id = "bd3683f7-7525-4aa9-adab-167ed0b1db04"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "wishlisht-media"
+
+[site]
+bucket = "./dist"
