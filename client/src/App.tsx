@@ -206,10 +206,16 @@ function App() {
         imageKey = key;
       }
 
+      // Prepend https:// if missing
+      let submitUrl = formData.url.trim();
+      if (submitUrl && !/^https?:\/\//i.test(submitUrl)) {
+        submitUrl = 'https://' + submitUrl;
+      }
+
       const payload = {
         name: formData.name,
         price: parseFloat(formData.price),
-        url: formData.url,
+        url: submitUrl,
         category: formData.category,
         image_key: imageKey,
         ...(editingItem ? {} : { priority: items.length }) 
@@ -377,7 +383,7 @@ function App() {
                 <label className="text-[10px] font-bold uppercase tracking-wide">Link URL</label>
                 <input
                   required
-                  type="url"
+                  type="text"
                   className="w-full bg-gray-50 border-b border-gray-200 p-2 text-sm focus:outline-none focus:border-black transition-colors rounded-none"
                   value={formData.url}
                   onChange={e => setFormData({...formData, url: e.target.value})}
@@ -388,16 +394,28 @@ function App() {
                 <label className="block text-[10px] font-bold uppercase tracking-wide mb-2">Image</label>
                 <div className="flex items-center gap-4">
                   {formData.currentImageKey && !formData.imageFile && (
-                    <div className="w-12 h-12 border border-gray-200 p-1">
+                    <div className="w-12 h-12 border border-gray-200 p-1 flex-shrink-0">
                       <img src={`/image/${formData.currentImageKey}`} className="w-full h-full object-contain" />
                     </div>
                   )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-black file:text-white hover:file:bg-gray-800 cursor-pointer"
-                    onChange={e => setFormData({...formData, imageFile: e.target.files ? e.target.files[0] : null})}
-                  />
+                  <div className="flex-1 min-w-0">
+                    <input
+                      type="file"
+                      id="image-upload"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={e => setFormData({...formData, imageFile: e.target.files ? e.target.files[0] : null})}
+                    />
+                    <label 
+                      htmlFor="image-upload"
+                      className="inline-block bg-black text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:bg-gray-800 transition-colors"
+                    >
+                      {formData.imageFile ? 'Change File' : 'Choose File'}
+                    </label>
+                    <p className="mt-1 text-[10px] text-gray-500 truncate">
+                      {formData.imageFile ? formData.imageFile.name : 'No file chosen'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
