@@ -3,7 +3,8 @@ import {
   DndContext,
   closestCenter,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -35,7 +36,17 @@ interface Item {
 }
 
 // Minimalist Item Component
-function SortableItem({ item, onEdit }: { item: Item; onEdit: (item: Item) => void }) {
+function SortableItem({ 
+  item, 
+  onEdit, 
+  isTapped, 
+  onTap 
+}: { 
+  item: Item; 
+  onEdit: (item: Item) => void; 
+  isTapped: boolean; 
+  onTap: (id: number) => void; 
+}) {
   const {
     attributes,
     listeners,
@@ -53,7 +64,12 @@ function SortableItem({ item, onEdit }: { item: Item; onEdit: (item: Item) => vo
     <div
       ref={setNodeRef}
       style={style}
-      className="group relative"
+      className="group relative touch-manipulation"
+      onClick={(e) => {
+        // Prevent background click from clearing state immediately
+        e.stopPropagation();
+        onTap(item.id);
+      }}
     >
       <div className="aspect-square bg-gray-50 overflow-hidden relative border border-gray-100">
          {/* Drag Handle Overlay */}
@@ -63,11 +79,14 @@ function SortableItem({ item, onEdit }: { item: Item; onEdit: (item: Item) => vo
            className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing hover:bg-black/5 transition-colors"
         />
 
-        {/* Action Buttons (Visible on Hover/Focus) */}
-        <div className="absolute top-1 right-1 z-20 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Action Buttons (Visible on Hover or Tapped) */}
+        <div className={cn(
+          "absolute top-1 right-1 z-20 flex gap-1 transition-opacity duration-200",
+          isTapped ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        )}>
           <button 
             onClick={(e) => { e.stopPropagation(); onEdit(item); }}
-            className="p-1 bg-white border border-gray-200 text-black hover:bg-gray-50"
+            className="p-1 bg-white border border-gray-200 text-black hover:bg-gray-50 cursor-pointer"
           >
             <Edit2 size={10} />
           </button>
@@ -75,7 +94,8 @@ function SortableItem({ item, onEdit }: { item: Item; onEdit: (item: Item) => vo
             href={item.url}
             target="_blank"
             rel="noreferrer"
-            className="p-1 bg-white border border-gray-200 text-black hover:bg-gray-50"
+            onClick={(e) => e.stopPropagation()}
+            className="p-1 bg-white border border-gray-200 text-black hover:bg-gray-50 cursor-pointer"
           >
             <ExternalLink size={10} />
           </a>
@@ -105,6 +125,7 @@ function SortableItem({ item, onEdit }: { item: Item; onEdit: (item: Item) => vo
 function App() {
   const [items, setItems] = useState<Item[]>([]);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [tappedItemId, setTappedItemId] = useState<number | null>(null);
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -122,7 +143,17 @@ function App() {
   });
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 10,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -272,17 +303,17 @@ function App() {
     <div className="min-h-screen bg-white text-black font-sans">
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-100">
-        <div className="max-w-[1600px] mx-auto px-4 h-12 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <h1 className="text-sm font-bold tracking-tight uppercase">Wishlisht</h1>
+        <div className="max-w-[1600px] mx-auto px-4 h-12 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-6 overflow-hidden">
+            <h1 className="text-sm font-bold tracking-tight uppercase flex-shrink-0">Wishlisht</h1>
             
-            <nav className="hidden md:flex items-center gap-4">
+            <nav className="flex items-center gap-4 overflow-x-auto no-scrollbar mask-fade">
               {categories.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
                   className={cn(
-                    "text-[11px] uppercase tracking-wide hover:text-black transition-colors cursor-pointer",
+                    "text-[11px] uppercase tracking-wide hover:text-black transition-colors cursor-pointer whitespace-nowrap",
                     activeCategory === cat ? "text-black font-bold border-b border-black" : "text-gray-400"
                   )}
                 >
@@ -294,26 +325,36 @@ function App() {
 
           <button
             onClick={() => openModal()}
-            className="flex items-center gap-1 bg-black text-white px-3 py-1 text-[10px] uppercase tracking-wider font-bold hover:bg-gray-800 transition-colors cursor-pointer"
+            className="flex items-center gap-1 bg-black text-white px-3 py-1 text-[10px] uppercase tracking-wider font-bold hover:bg-gray-800 transition-colors cursor-pointer flex-shrink-0"
           >
             <Plus size={12} />
-            Add New
+            <span className="hidden sm:inline">Add New</span>
+            <span className="sm:hidden">Add</span>
           </button>
         </div>
       </div>
 
       {/* Main Grid */}
-      <main className="max-w-[1600px] mx-auto px-4 pt-20 pb-12">
+      <main 
+        className="max-w-[1600px] mx-auto px-4 pt-20 pb-12 min-h-screen"
+        onClick={() => setTappedItemId(null)}
+      >
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={filteredItems.map(i => i.id)} strategy={rectSortingStrategy}>
-            {/* Extremely dense grid: starts at 4 cols, goes up to 10 */}
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-x-4 gap-y-8">
+            {/* Extremely dense grid: starts at 3 cols */}
+            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-x-4 gap-y-8">
               {filteredItems.map((item) => (
-                <SortableItem key={item.id} item={item} onEdit={openModal} />
+                <SortableItem 
+                  key={item.id} 
+                  item={item} 
+                  onEdit={openModal} 
+                  isTapped={tappedItemId === item.id}
+                  onTap={setTappedItemId}
+                />
               ))}
             </div>
           </SortableContext>
@@ -329,7 +370,7 @@ function App() {
       {/* Edit/Add Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm bg-white border border-black shadow-2xl p-6 relative">
+          <div className="w-full max-w-sm bg-white border border-black shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
             <button 
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 text-black hover:opacity-50 cursor-pointer"
@@ -381,13 +422,26 @@ function App() {
 
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wide">Link URL</label>
-                <input
-                  required
-                  type="text"
-                  className="w-full bg-gray-50 border-b border-gray-200 p-2 text-sm focus:outline-none focus:border-black transition-colors rounded-none"
-                  value={formData.url}
-                  onChange={e => setFormData({...formData, url: e.target.value})}
-                />
+                <div className="flex gap-2">
+                    <input
+                    required
+                    type="text"
+                    className="w-full bg-gray-50 border-b border-gray-200 p-2 text-sm focus:outline-none focus:border-black transition-colors rounded-none"
+                    value={formData.url}
+                    onChange={e => setFormData({...formData, url: e.target.value})}
+                    />
+                    {formData.url && (
+                        <a 
+                            href={formData.url.match(/^https?:\/\//) ? formData.url : `https://${formData.url}`} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="bg-gray-100 p-2 hover:bg-gray-200 transition-colors flex items-center justify-center"
+                            title="Visit Link"
+                        >
+                            <ExternalLink size={14} />
+                        </a>
+                    )}
+                </div>
               </div>
 
               <div className="space-y-1 pt-2">
